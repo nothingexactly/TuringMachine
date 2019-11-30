@@ -1,18 +1,46 @@
+// Problem with head display on reaching the far right of screen
+
+// String methods:
+// String s = "h2";
+// s.length() == 2
+// s.substring(0,1) == "h"
+// s.substring(1,2); == "2"
+
 char[] tape;
-int len = 0;
-int charWidth = 15;
-int n = 200;
-int head = 0;
-int phead = 0;            // perhaps use this
-char config = 'b';
-PVector loc;
-boolean paused = false;
+int len = 0;      // furthest visited position by r/w head
+int n = 200;      // length of the "infinite" tape
+int head = 0;     // r/w head position
+int cw = 15;      // character width
+int pad = 20;     // padding
+
+String[] rw;      // read/write instructions array for the selected m-configuration
+int lastEntry;    // length for this operation
+int instruction = 0;  // instruction to be executed for this configuration
+float shiftVel = 2;   // rate at which the r/w head moves in px/frame
+
+boolean operating = false;  // indicates when all the instructions in the array
+                            // have been executed and a new set of instructions
+                            // must be loaded
+                            
+char config = 'b'; // the machine-configuration (m-configuration)
+PVector loc = new PVector(pad,-5+height/4);  // location of the r/w head
+PVector target = new PVector(0,0);           // target location for the r/w head
+
+PFont style;
 
 void setup() {
-  size(1300,500);
+  size(800,500);
   tape = new char[n];
+  
+  rw = new String[10];  // read/write head instructions
+  lastEntry = 0;        // the final instruction in the array
+  
   len = head;
-  loc = new PVector(-20,-20);
+  loc = new PVector(-5,-5+height/4);
+  style = createFont("Monaco",16);
+  textFont(style);
+  
+  // initialize the tape to empty char's
   for (int i = 0 ; i < n ; i++) {
    tape[i] = ' '; 
   }
@@ -22,83 +50,181 @@ void draw() {
   background(255);
   fill(0);
   
-  if (frameCount%60 == 0 && !paused) {
-     update(); 
+  if (!operating) {
+    update();       // build the next array of instructions
+    instruction = 0;
+  } else {
+    execute();      // execute each instruction in the array
   }
   
   fill(0);
+  
   textAlign(CENTER,CENTER);
   text("m-configuration: "+config,width/2,50);
-  displayTape(tape,len,15,20);
+  text("Instruction: ",width/2-30,70);
+  
+  if (operating) {
+    text(rw[instruction],width/2+40,70);
+  }
+  
+  fill(0);
+  displayTape(tape,len);
+}
+
+void execute() {
+  String ins = rw[instruction];         // the present instruction in the array
+  
+  // move, print, change configuration
+  String type = ins.substring(0,1);
+  
+  // 'x',' ','1','0','e'
+  String value = ins.substring(1,ins.length());
+  
+  if (type.charAt(0) == 'h') {          // move the head
+  
+     int headIndex = Integer.parseInt(value);
+         target = new PVector(pad+(headIndex*cw),-5+height/4);
+     
+     PVector sep = PVector.sub(target,loc);
+     
+      if (sep.mag() <= shiftVel) {
+           loc = new PVector(target.x,target.y);
+           head = headIndex;
+           instruction++;
+      } else {
+           int temp = (headIndex-head);
+           int dir = 1;
+           
+           if (temp != 0) {
+             dir = (headIndex-head)/abs(headIndex-head);
+           }
+           
+           loc.x += (shiftVel*dir);
+      }
+  
+  } else if (type.charAt(0) == 'p') {   // edit tape
+    println("instruction "+ins);
+    tape[head] = ins.charAt(1);
+    
+    println("head index "+head);
+    println("value at head index "+tape[head]);
+    instruction++;
+    
+  } else if (type.charAt(0) == 'c') {   // edit m-configuration    
+    
+    config = ins.charAt(1);
+    instruction++;
+    
+  }
+  
+  if (len < head) {
+    len = head;
+  }
+  
+  if (instruction > lastEntry) {  // then draw() should call update()
+     operating = false;
+     instruction = -1;
+  }
 }
 
 void update() {
+
+  rw = new String[10];
+  lastEntry = 0;
   
   if (config == 'b') {
     // initialize the machine
-     tape[0] = 'e';
-     tape[1] = 'e';
-     tape[2] = '0';
-     tape[4] = '0';
-     head = 2;
-     config = 'o';
      
-  } else if (config == 'o') {     
-     if (tape[head] == '1') {
-       head++;
-       headCheck();
+     rw[0] = "h0";
+     rw[1] = "pe";
+     rw[2] = "h1";
+     rw[3] = "pe";
+     rw[4] = "h2";
+     rw[5] = "p0";
+     rw[6] = "h4";
+     rw[7] = "p0";
+     rw[8] = "h2";
+     rw[9] = "co";
+     lastEntry = 9;
+     operating = true;
+     
+  } else if (config == 'o') {
+    
+     if (tape[head] == '1') {    // two shifts
        
-       tape[head] = 'x';
-       head -= 3;
-       config = 'o';
+       rw[0] = "h"+(head+1);
+       rw[1] = "px";
+       rw[2] = "h"+(head+(1-3)); // careful here
+       rw[3] = "co";
+       lastEntry = 3;
+       operating = true;
+       
      } else if (tape[head] == '0') {
        config = 'q';
      }
      
   } else if (config == 'q') {
     
-    if (tape[head] == '0' || tape[head] == '1') {
-      head += 2;
-      headCheck();
-
-      config = 'q';
+    if (tape[head] == '0' || tape[head] == '1') {  // one shift
+      
+      rw[0] = "h"+(head+2);
+      rw[1] = "cq";
+      lastEntry = 1;
+      operating = true;
+      
     } else if (tape[head] == ' ') {
-      tape[head] = '1';
-      head--; 
-      config = 'p';
+    
+      rw[0] = "p1";
+      rw[1] = "h"+(head-1); 
+      rw[2] = "cp";
+      lastEntry = 2;
+      operating = true;      
+      
     }
     
   } else if (config == 'p') {
     
     if (tape[head] == 'x') {
-       tape[head] = ' ';
-       head++;
-       headCheck();
-
-       config = 'q';
+    
+       rw[0] = "p ";
+       rw[1] = "h"+(head+1);
+       rw[2] = "cq";
+       lastEntry = 2;
+       operating = true;
+       
     } else if (tape[head] == 'e') {
-      head++;
-      headCheck();
 
-      config = 'f';
+      rw[0] = "h"+(head+1);
+      rw[1] = "cf";
+      lastEntry = 1;
+      operating = true;
+      
     } else if (tape[head] == ' ') {
-      head -= 2;
-      headCheck();
 
-      config = 'p';
+      rw[0] = "h"+(head-2); 
+      rw[1] = "cp";
+      lastEntry = 1;
+      operating = true;
+      
     }
     
   } else {  // config == 'f'
     
     if (tape[head] != ' ') {
-     head += 2;
-     headCheck();
 
-     config = 'f'; 
+     rw[0] = "h"+(head+2);
+     rw[1] = "cf";
+     lastEntry = 1;
+     operating = true;
+     
     } else {
-     tape[head] = '0';
-     head -= 2;
-     config = 'o'; 
+
+     rw[0] = "p0";
+     rw[1] = "h"+(head-2);
+     rw[2] = "co";
+     lastEntry = 2;
+     operating = true;
+     
     }
     
   }
@@ -109,14 +235,10 @@ void update() {
   
 }
 
-void displayTape(char[] t, int l, int cw, int pad) {
+void displayTape(char[] t, int l) {
   if (l < round((width-(2*pad))/cw)) {
     textAlign(CENTER, LEFT);
-    for (int i = 0 ; i < l ; i++) {
-      
-      if (i == head) {
-       loc = new PVector(pad+(i*cw),-5+height/4);
-      }
+    for (int i = 0 ; i <= l ; i++) {
       
       if (t[i] == '1') {
        fill(0,0,255); 
@@ -129,13 +251,9 @@ void displayTape(char[] t, int l, int cw, int pad) {
     int set = floor((width-(2*pad))/cw)+1;
     int start = l-set;
     
-    for (int i = start ; i < l ; i++) {
+    for (int i = start ; i < l; i++) {
       if (i < 0) {  // why does this happen occasionally?
        i = 0; 
-      }
-      
-      if (i == head) {
-       loc = new PVector(pad+(i*cw),-5+height/4);
       }
       
       if (t[i] == '1') {
@@ -148,21 +266,9 @@ void displayTape(char[] t, int l, int cw, int pad) {
       text(t[i],pad+((i-start)*cw),height/4);
     }
   }
-         noFill();
-         rectMode(CENTER);
-         rect(loc.x,loc.y,cw+3,cw+3);
-
-}
-
-void headCheck() {
- if (head >= n) {
-  paused = true;
-  head = 0;
- } 
-}
-
-void keyPressed() {
-   if (key == 'p' && head < n) {
-      paused = !paused;
-   } 
+         
+       // show the read/write head
+           noFill();
+           rectMode(CENTER);
+           rect(loc.x,loc.y,cw+3,cw+3);
 }
