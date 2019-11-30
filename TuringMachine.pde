@@ -1,22 +1,30 @@
-// Problem with head display on reaching the far right of screen
+// A small problem with the way the head
+// bounces off far right of screen
 
 // String methods:
 // String s = "h2";
 // s.length() == 2
 // s.substring(0,1) == "h"
-// s.substring(1,2); == "2"
+// s.substring(1,2) == "2"
+// char b = s.charAt(0); b == 'h'
 
 char[] tape;
 int len = 0;      // furthest visited position by r/w head
 int n = 200;      // length of the "infinite" tape
 int head = 0;     // r/w head position
 int cw = 15;      // character width
-int pad = 20;     // padding
+int pad = 40;     // padding
 
 String[] rw;      // read/write instructions array for the selected m-configuration
+
+// "h0" means "head to index (position) 0 of the tape"
+// "p1" means "print a '1' at this head position"
+// "p " means "erase tape at this head position"
+// "co" means "set the configuration to 'o'"
+
 int lastEntry;    // length for this operation
 int instruction = 0;  // instruction to be executed for this configuration
-float shiftVel = 2;   // rate at which the r/w head moves in px/frame
+float shiftVel = 1;   // rate at which the r/w head moves in px/frame
 
 boolean operating = false;  // indicates when all the instructions in the array
                             // have been executed and a new set of instructions
@@ -24,6 +32,7 @@ boolean operating = false;  // indicates when all the instructions in the array
                             
 char config = 'b'; // the machine-configuration (m-configuration)
 PVector loc = new PVector(pad,-5+height/4);  // location of the r/w head
+PVector headAdjust = new PVector(0,0);
 PVector target = new PVector(0,0);           // target location for the r/w head
 
 PFont style;
@@ -71,6 +80,10 @@ void draw() {
   displayTape(tape,len);
 }
 
+//--------------- ANIMATE -------------------
+//----- Execute present instruction set -----
+//-------------------------------------------
+
 void execute() {
   String ins = rw[instruction];         // the present instruction in the array
   
@@ -103,18 +116,11 @@ void execute() {
       }
   
   } else if (type.charAt(0) == 'p') {   // edit tape
-    println("instruction "+ins);
     tape[head] = ins.charAt(1);
-    
-    println("head index "+head);
-    println("value at head index "+tape[head]);
-    instruction++;
-    
+    instruction++;    
   } else if (type.charAt(0) == 'c') {   // edit m-configuration    
-    
     config = ins.charAt(1);
     instruction++;
-    
   }
   
   if (len < head) {
@@ -127,10 +133,16 @@ void execute() {
   }
 }
 
+//-------------- GENERATE -----------------
+//----- Generate next instruction set -----
+//-----------------------------------------
+
 void update() {
 
   rw = new String[10];
   lastEntry = 0;
+  
+  float headAdjust = 0;
   
   if (config == 'b') {
     // initialize the machine
@@ -235,7 +247,13 @@ void update() {
   
 }
 
+// --------- DISPLAY ---------
+
 void displayTape(char[] t, int l) {
+  
+  // if length of the tape is less than
+  // width of the viewport
+  
   if (l < round((width-(2*pad))/cw)) {
     textAlign(CENTER, LEFT);
     for (int i = 0 ; i <= l ; i++) {
@@ -248,10 +266,18 @@ void displayTape(char[] t, int l) {
       text(t[i],pad+(i*cw),height/4);
     }
   } else {
-    int set = floor((width-(2*pad))/cw)+1;
-    int start = l-set;
+  
+  // display the end section of the tape
+  // such that it fills the viewport
     
-    for (int i = start ; i < l; i++) {
+    int set = floor((width-(2*pad))/cw)+1;  // number of consecutive tape squares to display
+    int start = l-set;                      // how far into the tape to start
+    
+    headAdjust.x = -(start*cw);             // the amount by which the head's position (determined
+                                            // by the head index * cw and stored in loc) is to be
+                                            // adjusted to due to horizontal scrolling
+                                            
+    for (int i = start ; i < l; i++) {    
       if (i < 0) {  // why does this happen occasionally?
        i = 0; 
       }
@@ -270,5 +296,5 @@ void displayTape(char[] t, int l) {
        // show the read/write head
            noFill();
            rectMode(CENTER);
-           rect(loc.x,loc.y,cw+3,cw+3);
+           rect(loc.x+headAdjust.x,loc.y+headAdjust.y-1,cw+5,cw+5);
 }
