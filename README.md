@@ -6,8 +6,7 @@ This implementation is described in the Charles Petzold book *The Annotated Turi
 
 The code is not particularly readable unfortunately. I've learned my lessons.
 
-[Square Root](media/state-machine.png)
-
+<img src="./media/state-machine.png" alt="state-machine" width="400px"/>
 
 ## Installation
 
